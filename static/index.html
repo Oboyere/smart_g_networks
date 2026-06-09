@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Smart G Networks | Central Stock & Branch Transfer System</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+<div id="loginScreen" class="login-container">
+    <div class="login-card">
+        <h2><i class="fas fa-network-wired"></i> Smart G Networks</h2>
+        <div class="sub">Central Stock & Branch Transfer System</div>
+        <div class="input-group"><label>Email</label><input type="email" id="loginEmail" placeholder="admin@smartg.co.ke or branch email"></div>
+        <div class="input-group"><label>Select Role / Branch</label><select id="loginBranchSelect"></select></div>
+        <div class="input-group"><label>Password</label><input type="password" id="loginPassword" placeholder="Enter password"></div>
+        <button class="login-btn" id="doLoginBtn"><i class="fas fa-sign-in-alt"></i> Login</button>
+        <button class="switch-btn" id="showRegisterBtn"><i class="fas fa-user-plus"></i> Create New Branch</button>
+        <button class="forgot-link" id="forgotPasswordBtn"><i class="fas fa-key"></i> Forgot Password?</button>
+        <div id="loginError" class="error-msg" style="display:none;"></div>
+        <div class="sub" style="margin-top:20px;font-size:0.7rem;">Admin: admin@smartg.co.ke / admin123</div>
+    </div>
+</div>
+
+<div id="registerScreen" class="register-container" style="display:none;">
+    <div class="register-card">
+        <h2><i class="fas fa-store"></i> Register New Branch <span class="admin-only-badge">Admin Only</span></h2>
+        <div class="input-group"><label>Branch Name</label><input type="text" id="regBranchName" placeholder="e.g., Eldoret Branch"></div>
+        <div class="input-group"><label>Manager Name</label><input type="text" id="regManagerName" placeholder="Full name"></div>
+        <div class="input-group"><label>Manager Email (Login ID)</label><input type="email" id="regEmail" placeholder="manager@branch.com"></div>
+        <div class="input-group"><label>Password</label><input type="password" id="regPassword" placeholder="Create password"></div>
+        <div class="input-group"><label>Confirm Password</label><input type="password" id="regConfirmPassword" placeholder="Confirm"></div>
+        <button class="register-btn" id="doRegisterBtn">Register Branch</button>
+        <button class="switch-btn" id="backToLoginBtn">Back to Login</button>
+        <div id="registerMessage" class="error-msg" style="display:none;"></div>
+    </div>
+</div>
+
+<div id="resetPasswordModal" class="modal"><div class="modal-card"><h2>Reset Password</h2><div class="input-group"><label>Email</label><input type="email" id="resetEmail"></div><div class="input-group"><label>New Password</label><input type="password" id="resetNewPassword"></div><div class="input-group"><label>Confirm</label><input type="password" id="resetConfirmPassword"></div><button class="login-btn" id="performResetBtn">Reset</button><button class="switch-btn" id="closeResetModalBtn">Cancel</button><div id="resetMessage" class="error-msg"></div></div></div>
+
+<!-- Product Create Modal -->
+<div id="productModal" class="modal">
+    <div class="modal-card">
+        <h2><i class="fas fa-box"></i> Create New Product</h2>
+        <div class="input-group"><label>Product Code</label><input type="text" id="prodCode" placeholder="e.g., P002"></div>
+        <div class="input-group"><label>Product Name</label><input type="text" id="prodName" placeholder="Product name"></div>
+        <div class="input-group"><label>Selling Price (Ksh)</label><input type="number" id="prodPrice" placeholder="0"></div>
+        <div class="input-group"><label>Cost Price (Ksh)</label><input type="number" id="prodCost" placeholder="0"></div>
+        <div class="input-group"><label>Sales Commission (Ksh per unit)</label><input type="number" id="prodSalesComm" value="0"></div>
+        <div class="input-group"><label>Manager Commission (Ksh per unit)</label><input type="number" id="prodManagerComm" value="0"></div>
+        <div class="input-group"><label>Initial Central Stock</label><input type="number" id="prodStock" value="0"></div>
+        <div class="input-group"><label>Low Stock Threshold</label><input type="number" id="prodThreshold" value="5"></div>
+        <button class="btn-primary" id="saveProductBtn">Create Product</button>
+        <button class="switch-btn" id="closeProductModalBtn">Cancel</button>
+    </div>
+</div>
+
+<!-- Add Stock Modal -->
+<div id="addStockModal" class="modal">
+    <div class="modal-card">
+        <h2><i class="fas fa-plus-circle"></i> Add Stock to Product</h2>
+        <div class="input-group"><label>Product</label><input type="text" id="addStockProductName" readonly style="background:#f1f5f9;"></div>
+        <div class="input-group"><label>Current Central Stock</label><input type="text" id="addStockCurrentStock" readonly style="background:#f1f5f9;"></div>
+        <div class="input-group"><label>Additional Quantity</label><input type="number" id="addStockQuantity" placeholder="Enter quantity to add"></div>
+        <button class="btn-primary" id="confirmAddStockBtn">Add Stock</button>
+        <button class="switch-btn" id="closeAddStockModalBtn">Cancel</button>
+    </div>
+</div>
+
+<!-- Reset Branch Password Modal (Admin Only) -->
+<div id="resetBranchPwdModal" class="modal">
+    <div class="modal-card">
+        <h2><i class="fas fa-key"></i> Reset Branch Password</h2>
+        <div class="input-group"><label>Branch</label><select id="resetBranchSelect" class="edit-input"></select></div>
+        <div class="input-group"><label>New Password</label><input type="password" id="resetBranchNewPwd" placeholder="New password"></div>
+        <div class="input-group"><label>Confirm Password</label><input type="password" id="resetBranchConfirmPwd" placeholder="Confirm password"></div>
+        <button class="btn-primary" id="performBranchResetBtn">Reset Password</button>
+        <button class="switch-btn" id="closeBranchResetModalBtn">Cancel</button>
+        <div id="branchResetMessage" class="error-msg" style="display:none;"></div>
+    </div>
+</div>
+
+<div id="appWrapper" class="app-wrapper" style="display:none;">
+    <div class="sidebar">
+        <div class="brand"><h2><i class="fas fa-charging-station"></i> Smart G</h2><p>Enterprise Inventory</p></div>
+        <div class="nav-links">
+            <div class="nav-item" data-nav="dashboard"><i class="fas fa-tachometer-alt"></i> <span>Dashboard</span></div>
+            <div class="nav-item" data-nav="company_profits"><i class="fas fa-chart-line"></i> <span>Company Profits</span></div>
+            <div class="nav-item" data-nav="newsale"><i class="fas fa-cart-plus"></i> <span>New Sale</span></div>
+            <div class="nav-item" data-nav="history"><i class="fas fa-history"></i> <span>Sales History</span></div>
+            <div class="nav-item" data-nav="inventory"><i class="fas fa-boxes"></i> <span>Inventory</span></div>
+            <div class="nav-item" data-nav="transfer"><i class="fas fa-exchange-alt"></i> <span>Stock Transfer</span></div>
+            <div class="nav-item" data-nav="products"><i class="fas fa-edit"></i> <span>Products</span></div>
+            <div class="nav-item" data-nav="product_balances"><i class="fas fa-balance-scale"></i> <span>Product Balances</span></div>
+            <div class="nav-item" data-nav="branches"><i class="fas fa-store-alt"></i> <span>Branches</span></div>
+            <div class="nav-item" data-nav="reports"><i class="fas fa-chart-simple"></i> <span>Reports</span></div>
+            <div class="nav-item" data-nav="expense"><i class="fas fa-receipt"></i> <span>Expense/Deduction</span></div>
+            <div class="nav-item" data-nav="reports_submit"><i class="fas fa-file-alt"></i> <span>Submit Report</span></div>
+            <div class="nav-item" data-nav="branch_approvals"><i class="fas fa-check-circle"></i> <span>Stock Approvals</span></div>
+        </div>
+        <div class="user-info"><div><i class="fas fa-user-cog"></i> <span id="userDisplayName">User</span><span id="adminBadge" class="admin-badge" style="display:none;">ADMIN</span></div><div style="font-size:0.7rem;" id="userBranchLabel"></div><button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button></div>
+    </div>
+    <div class="main-content" id="dynamicContent"></div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
