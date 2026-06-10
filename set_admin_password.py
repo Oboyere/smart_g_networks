@@ -47,4 +47,4 @@ def set_admin_password(email, new_password):
 
 if __name__ == "__main__":
     # Set default admin password
-    set_admin_password('admin@smartg.com', 'Admin@123')
+    set_admin_password('admin@smartg.co.ke', 'admin123')

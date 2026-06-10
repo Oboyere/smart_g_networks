@@ -99,6 +99,8 @@ async function navigateTo(view) {
     else if (view === 'expense') await renderExpenseDeduction();
     else if (view === 'reports_submit') await renderSubmitReport();
     else if (view === 'branch_approvals') await renderStockApprovals();
+    else if (view === 'check_report_status') await renderCheckReportStatus();
+    else if (view === 'admin_settings') await renderAdminSettings();
     setActiveNav();
 }
 
@@ -107,7 +109,8 @@ function setActiveNav() {
     const map = {
         dashboard: 0, company_profits: 1, newsale: 2, history: 3,
         inventory: 4, transfer: 5, products: 6, product_balances: 7,
-        branches: 8, reports: 9, expense: 10, reports_submit: 11, branch_approvals: 12
+        branches: 8, reports: 9, expense: 10, reports_submit: 11, branch_approvals: 12,
+        check_report_status: 13, admin_settings: 14
     };
     const idx = map[currentView] || 0;
     const navs = document.querySelectorAll('.nav-item');
@@ -786,6 +789,94 @@ async function renderExpenseDeduction() {
     });
 }
 
+// ==================== NEW FEATURES ====================
+// Feature 1: Branch can check report approval status
+async function renderCheckReportStatus() {
+    if (currentUser?.role === 'admin') {
+        document.getElementById("dynamicContent").innerHTML = `<div class="restricted-msg">This feature is for branches. Admins can view reports in the Reports section.</div>`;
+        return;
+    }
+    
+    const reports = await apiCall('/reports', 'GET');
+    
+    let html = `
+        <div class="top-bar">
+            <h1><i class="fas fa-file-check"></i> My Report Status</h1>
+            <div class="branch-badge">${currentUser?.branch_name || "Branch"}</div>
+        </div>
+        <div class="section-card">
+    `;
+    
+    if (reports.length === 0) {
+        html += '<p style="text-align:center;color:#64748b;">No reports submitted yet.</p>';
+    } else {
+        html += '<div style="overflow-x:auto;"><table><thead><tr><th>Title</th><th>Submitted Date</th><th>Production</th><th>Commission</th><th>Status</th><th>Admin Comment</th></tr></thead><tbody>';
+        
+        reports.forEach(r => {
+            const submittedDate = new Date(r.created_at).toLocaleDateString();
+            const statusBadge = r.status === 'approved' ? '<span class="badge-approved">✓ Approved</span>' : 
+                               (r.status === 'rejected' ? '<span class="badge-rejected">✗ Rejected</span>' : '<span class="badge-pending">⏳ Pending</span>');
+            html += `
+                <tr>
+                    <td><strong>${r.title}</strong></td>
+                    <td>${submittedDate}</td>
+                    <td>Ksh ${(r.daily_production || 0).toLocaleString()}</td>
+                    <td>Ksh ${(r.sales_commission || 0).toLocaleString()}</td>
+                    <td>${statusBadge}</td>
+                    <td>${r.admin_comment ? `<small>${r.admin_comment}</small>` : 'N/A'}</td>
+                </tr>
+            `;
+        });
+        
+        html += '</tbody></table></div>';
+    }
+    
+    html += '</div>';
+    document.getElementById("dynamicContent").innerHTML = html;
+}
+
+// Feature 2: Admin can change password
+async function renderAdminSettings() {
+    if (currentUser?.role !== 'admin') {
+        document.getElementById("dynamicContent").innerHTML = `<div class="restricted-msg">Admin access only</div>`;
+        return;
+    }
+    
+    const html = `
+        <div class="top-bar">
+            <h1><i class="fas fa-cog"></i> Admin Settings</h1>
+            <div class="branch-badge">Administrator</div>
+        </div>
+        <div class="section-card">
+            <h3><i class="fas fa-key"></i> Security</h3>
+            <button class="btn-primary" id="openChangePasswordBtn">Change Password</button>
+        </div>
+        <div class="section-card">
+            <h3><i class="fas fa-trash"></i> Data Management</h3>
+            <button class="btn-danger" id="openResetSalesBtn">Reset Sales History</button>
+        </div>
+    `;
+    
+    document.getElementById("dynamicContent").innerHTML = html;
+    
+    document.getElementById("openChangePasswordBtn")?.addEventListener("click", () => {
+        document.getElementById("changeAdminPasswordModal").style.display = "flex";
+    });
+    
+    document.getElementById("openResetSalesBtn")?.addEventListener("click", async () => {
+        // Load branches for reset sales modal
+        try {
+            const branches = await apiCall('/branches', 'GET');
+            const branchSelect = document.getElementById("resetSalesBranch");
+            branchSelect.innerHTML = '<option value="">-- Select Branch --</option>' + 
+                branches.map(b => `<option value="${b.branch_id}">${b.branch_name}</option>`).join('');
+        } catch (e) {
+            console.error("Could not load branches", e);
+        }
+        document.getElementById("resetSalesModal").style.display = "flex";
+    });
+}
+
 // Login and Initialization
 async function initLoginSelect() {
     try {
@@ -821,6 +912,7 @@ document.getElementById("doLoginBtn").addEventListener("click", async () => {
         document.getElementById("appWrapper").style.display = "flex";
         document.getElementById("userDisplayName").innerText = currentUser.role === 'admin' ? "Administrator" : `Mgr: ${currentUser.name}`;
         document.getElementById("adminBadge").style.display = currentUser.role === 'admin' ? 'inline-block' : 'none';
+        document.getElementById("adminSettingsNav").style.display = currentUser.role === 'admin' ? 'flex' : 'none';
         document.getElementById("userBranchLabel").innerHTML = currentUser.role === 'admin' ? 'Full Access (Profit Data Visible)' : 'Branch View (Limited Data)';
         
         await navigateTo("dashboard");
@@ -917,6 +1009,119 @@ document.getElementById("closeBranchResetModalBtn")?.addEventListener("click", (
     document.getElementById("resetBranchPwdModal").style.display = "none";
 });
 
+// New modal event listeners for the new features
+document.getElementById("closeChangePasswordModalBtn")?.addEventListener("click", () => {
+    document.getElementById("changeAdminPasswordModal").style.display = "none";
+    document.getElementById("currentAdminPassword").value = "";
+    document.getElementById("newAdminPassword").value = "";
+    document.getElementById("confirmAdminPassword").value = "";
+});
+
+document.getElementById("performChangePasswordBtn")?.addEventListener("click", async () => {
+    const currentPwd = document.getElementById("currentAdminPassword").value;
+    const newPwd = document.getElementById("newAdminPassword").value;
+    const confirmPwd = document.getElementById("confirmAdminPassword").value;
+    const msgDiv = document.getElementById("changePasswordMessage");
+    
+    msgDiv.innerText = "";
+    msgDiv.style.display = "none";
+    
+    if (!currentPwd || !newPwd) {
+        msgDiv.innerText = "All fields are required";
+        msgDiv.style.display = "block";
+        return;
+    }
+    
+    if (newPwd.length < 3) {
+        msgDiv.innerText = "New password must be at least 3 characters";
+        msgDiv.style.display = "block";
+        return;
+    }
+    
+    if (newPwd !== confirmPwd) {
+        msgDiv.innerText = "New passwords don't match";
+        msgDiv.style.display = "block";
+        return;
+    }
+    
+    try {
+        await apiCall('/admin/change-password', 'POST', {
+            current_password: currentPwd,
+            new_password: newPwd
+        });
+        showToast("Password changed successfully!");
+        document.getElementById("changeAdminPasswordModal").style.display = "none";
+        document.getElementById("currentAdminPassword").value = "";
+        document.getElementById("newAdminPassword").value = "";
+        document.getElementById("confirmAdminPassword").value = "";
+    } catch (e) {
+        msgDiv.innerText = e.message;
+        msgDiv.style.display = "block";
+    }
+});
+
+document.getElementById("closeResetSalesModalBtn")?.addEventListener("click", () => {
+    document.getElementById("resetSalesModal").style.display = "none";
+    document.getElementById("resetSalesType").value = "all";
+    document.getElementById("confirmResetText").value = "";
+    document.getElementById("dateInputGroup").style.display = "none";
+    document.getElementById("branchInputGroup").style.display = "none";
+});
+
+document.getElementById("resetSalesType")?.addEventListener("change", (e) => {
+    const type = e.target.value;
+    document.getElementById("dateInputGroup").style.display = type === 'date' ? 'block' : 'none';
+    document.getElementById("branchInputGroup").style.display = type === 'branch' ? 'block' : 'none';
+});
+
+document.getElementById("performResetSalesBtn")?.addEventListener("click", async () => {
+    const resetType = document.getElementById("resetSalesType").value;
+    const confirmText = document.getElementById("confirmResetText").value;
+    const msgDiv = document.getElementById("resetSalesMessage");
+    
+    msgDiv.innerText = "";
+    msgDiv.style.display = "none";
+    
+    if (confirmText !== "CONFIRM") {
+        msgDiv.innerText = "Please type 'CONFIRM' to proceed";
+        msgDiv.style.display = "block";
+        return;
+    }
+    
+    try {
+        const payload = { reset_type: resetType };
+        
+        if (resetType === 'date') {
+            const date = document.getElementById("resetSalesDate").value;
+            if (!date) {
+                msgDiv.innerText = "Please select a date";
+                msgDiv.style.display = "block";
+                return;
+            }
+            payload.sale_date = date;
+        } else if (resetType === 'branch') {
+            const branchId = document.getElementById("resetSalesBranch").value;
+            if (!branchId) {
+                msgDiv.innerText = "Please select a branch";
+                msgDiv.style.display = "block";
+                return;
+            }
+            payload.branch_id = parseInt(branchId);
+        }
+        
+        await apiCall('/admin/reset-sales', 'POST', payload);
+        showToast("Sales history reset successfully!");
+        document.getElementById("resetSalesModal").style.display = "none";
+        document.getElementById("resetSalesType").value = "all";
+        document.getElementById("confirmResetText").value = "";
+        document.getElementById("dateInputGroup").style.display = "none";
+        document.getElementById("branchInputGroup").style.display = "none";
+    } catch (e) {
+        msgDiv.innerText = e.message;
+        msgDiv.style.display = "block";
+    }
+});
+
 document.getElementById("saveProductBtn")?.addEventListener("click", async () => {
     const code = document.getElementById("prodCode").value;
     const name = document.getElementById("prodName").value;
@@ -965,6 +1170,7 @@ if (token) {
     if (currentUser.name) {
         document.getElementById("userDisplayName").innerText = currentUser.role === 'admin' ? "Administrator" : `Mgr: ${currentUser.name}`;
         document.getElementById("adminBadge").style.display = currentUser.role === 'admin' ? 'inline-block' : 'none';
+        document.getElementById("adminSettingsNav").style.display = currentUser.role === 'admin' ? 'flex' : 'none';
         navigateTo("dashboard");
     }
 }

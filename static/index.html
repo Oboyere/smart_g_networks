@@ -84,6 +84,40 @@
     </div>
 </div>
 
+<!-- Change Admin Password Modal -->
+<div id="changeAdminPasswordModal" class="modal">
+    <div class="modal-card">
+        <h2><i class="fas fa-key"></i> Change Admin Password</h2>
+        <div class="input-group"><label>Current Password</label><input type="password" id="currentAdminPassword" placeholder="Enter current password"></div>
+        <div class="input-group"><label>New Password</label><input type="password" id="newAdminPassword" placeholder="Enter new password"></div>
+        <div class="input-group"><label>Confirm Password</label><input type="password" id="confirmAdminPassword" placeholder="Confirm new password"></div>
+        <button class="btn-primary" id="performChangePasswordBtn">Change Password</button>
+        <button class="switch-btn" id="closeChangePasswordModalBtn">Cancel</button>
+        <div id="changePasswordMessage" class="error-msg" style="display:none;"></div>
+    </div>
+</div>
+
+<!-- Reset Sales History Modal -->
+<div id="resetSalesModal" class="modal">
+    <div class="modal-card">
+        <h2><i class="fas fa-trash"></i> Reset Sales History</h2>
+        <div class="info-box" style="background:#fee2e2;border:1px solid #fecaca;margin-bottom:15px;">
+            <i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> This action will permanently delete sales records. This cannot be undone!
+        </div>
+        <div class="input-group"><label>Reset Type</label><select id="resetSalesType" class="edit-input">
+            <option value="all">All Sales History</option>
+            <option value="date">Sales for Specific Date</option>
+            <option value="branch">Sales for Specific Branch</option>
+        </select></div>
+        <div class="input-group" id="dateInputGroup" style="display:none;"><label>Select Date</label><input type="date" id="resetSalesDate" class="edit-input"></div>
+        <div class="input-group" id="branchInputGroup" style="display:none;"><label>Select Branch</label><select id="resetSalesBranch" class="edit-input"></select></div>
+        <div class="input-group"><label>Type "CONFIRM" to proceed</label><input type="text" id="confirmResetText" class="edit-input" placeholder="Type CONFIRM"></div>
+        <button class="btn-primary" id="performResetSalesBtn">Reset Sales History</button>
+        <button class="switch-btn" id="closeResetSalesModalBtn">Cancel</button>
+        <div id="resetSalesMessage" class="error-msg" style="display:none;"></div>
+    </div>
+</div>
+
 <div id="appWrapper" class="app-wrapper" style="display:none;">
     <div class="sidebar">
         <div class="brand"><h2><i class="fas fa-charging-station"></i> Smart G</h2><p>Enterprise Inventory</p></div>
@@ -101,6 +135,8 @@
             <div class="nav-item" data-nav="expense"><i class="fas fa-receipt"></i> <span>Expense/Deduction</span></div>
             <div class="nav-item" data-nav="reports_submit"><i class="fas fa-file-alt"></i> <span>Submit Report</span></div>
             <div class="nav-item" data-nav="branch_approvals"><i class="fas fa-check-circle"></i> <span>Stock Approvals</span></div>
+            <div class="nav-item" data-nav="check_report_status"><i class="fas fa-file-check"></i> <span>Report Status</span></div>
+            <div class="nav-item" data-nav="admin_settings" id="adminSettingsNav" style="display:none;"><i class="fas fa-cog"></i> <span>Admin Settings</span></div>
         </div>
         <div class="user-info"><div><i class="fas fa-user-cog"></i> <span id="userDisplayName">User</span><span id="adminBadge" class="admin-badge" style="display:none;">ADMIN</span></div><div style="font-size:0.7rem;" id="userBranchLabel"></div><button class="logout-btn" id="logoutBtn"><i class="fas fa-sign-out-alt"></i> Logout</button></div>
     </div>

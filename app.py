@@ -706,5 +706,92 @@ def get_today_production():
         'sales_commission': float(result['sales_commission'])
     })
 
+# ==================== ADMIN FEATURES ====================
+@app.route('/api/admin/change-password', methods=['POST'])
+@token_required
+def admin_change_password():
+    if request.user['role'] != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    data = request.json
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+    
+    if not current_password or not new_password:
+        return jsonify({'error': 'All fields required'}), 400
+    
+    db = get_db()
+    cursor = db.cursor(dictionary=True)
+    
+    # Get admin's current password hash
+    cursor.execute("SELECT password_hash FROM users WHERE id = %s", (request.user['id'],))
+    user = cursor.fetchone()
+    
+    if not user or not check_password(current_password, user['password_hash']):
+        cursor.close()
+        db.close()
+        return jsonify({'error': 'Current password is incorrect'}), 401
+    
+    # Update password
+    password_hash = hash_password(new_password)
+    cursor.execute("UPDATE users SET password_hash = %s WHERE id = %s", 
+                   (password_hash, request.user['id']))
+    db.commit()
+    cursor.close()
+    db.close()
+    
+    return jsonify({'success': True, 'message': 'Password changed successfully'})
+
+@app.route('/api/admin/reset-sales', methods=['POST'])
+@token_required
+def admin_reset_sales():
+    if request.user['role'] != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    data = request.json
+    reset_type = data.get('reset_type', 'all')  # 'all', 'date', 'branch'
+    
+    db = get_db()
+    cursor = db.cursor()
+    
+    try:
+        if reset_type == 'all':
+            # Delete all sales and sale items
+            cursor.execute("DELETE FROM sale_items")
+            cursor.execute("DELETE FROM sales")
+        elif reset_type == 'date':
+            # Delete sales for specific date
+            sale_date = data.get('sale_date')
+            if not sale_date:
+                return jsonify({'error': 'Sale date required'}), 400
+            cursor.execute("SELECT id FROM sales WHERE sale_date = %s", (sale_date,))
+            sale_ids = [row[0] for row in cursor.fetchall()]
+            if sale_ids:
+                for sale_id in sale_ids:
+                    cursor.execute("DELETE FROM sale_items WHERE sale_id = %s", (sale_id,))
+                cursor.execute("DELETE FROM sales WHERE sale_date = %s", (sale_date,))
+        elif reset_type == 'branch':
+            # Delete sales for specific branch
+            branch_id = data.get('branch_id')
+            if not branch_id:
+                return jsonify({'error': 'Branch ID required'}), 400
+            cursor.execute("SELECT id FROM sales WHERE branch_id = %s", (branch_id,))
+            sale_ids = [row[0] for row in cursor.fetchall()]
+            if sale_ids:
+                for sale_id in sale_ids:
+                    cursor.execute("DELETE FROM sale_items WHERE sale_id = %s", (sale_id,))
+                cursor.execute("DELETE FROM sales WHERE branch_id = %s", (branch_id,))
+        
+        db.commit()
+        cursor.close()
+        db.close()
+        
+        return jsonify({'success': True, 'message': f'Sales history reset successfully ({reset_type})'})
+    except Exception as e:
+        db.rollback()
+        cursor.close()
+        db.close()
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

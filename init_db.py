@@ -25,16 +25,16 @@ def create_default_admin():
         
         if not existing_admin:
             # Create default admin
-            default_password = 'Admin@123'
+            default_password = 'admin123'
             password_hash = hash_password(default_password)
             
             cursor.execute(
                 "INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)",
-                ('Administrator', 'admin@smartg.com', password_hash, 'admin')
+                ('Administrator', 'admin@smartg.co.ke', password_hash, 'admin')
             )
             conn.commit()
             print("✅ Default admin user created!")
-            print(f"   Email: admin@smartg.com")
+            print(f"   Email: admin@smartg.co.ke")
             print(f"   Password: {default_password}")
             print("   ⚠️  Please change the password after first login!")
         else:
