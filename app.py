@@ -31,13 +31,18 @@ def init_db_on_startup():
 
 # Database connection
 def get_db():
-    return mysql.connector.connect(
-        host=app.config['MYSQL_HOST'],
-        user=app.config['MYSQL_USER'],
-        password=app.config['MYSQL_PASSWORD'],
-        database=app.config['MYSQL_DATABASE'],
-        port=app.config['MYSQL_PORT']
-    )
+    try:
+        return mysql.connector.connect(
+            host=app.config['MYSQL_HOST'] or 'localhost',
+            user=app.config['MYSQL_USER'] or 'root',
+            password=app.config['MYSQL_PASSWORD'] or '',
+            database=app.config['MYSQL_DATABASE'] or 'smart_g_networks',
+            port=app.config['MYSQL_PORT'] or 3306
+        )
+    except Exception as e:
+        print(f"Database connection failed: {e}")
+        print(f"Config - Host: {app.config['MYSQL_HOST']}, User: {app.config['MYSQL_USER']}, DB: {app.config['MYSQL_DATABASE']}")
+        raise
 
 # JWT Decorator
 def token_required(f):
@@ -70,6 +75,12 @@ def serve_index():
 @app.route('/static/<path:path>')
 def serve_static(path):
     return send_from_directory('static', path)
+
+# Health check endpoint
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Railway"""
+    return jsonify({'status': 'healthy'}), 200
 
 # ==================== AUTHENTICATION ====================
 @app.route('/api/login', methods=['POST'])
@@ -129,6 +140,10 @@ def login():
 @app.route('/api/public/branches', methods=['GET'])
 def get_branches_public():
     """Public endpoint for login page to fetch branches"""
+    global _db_initialized
+    if not _db_initialized:
+        init_db_on_startup()
+    
     db = get_db()
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT id, branch_id, branch_name FROM users WHERE role = 'manager' ORDER BY branch_name")

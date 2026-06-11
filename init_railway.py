@@ -24,13 +24,19 @@ def init_database():
     try:
         print("🔄 Connecting to Railway MySQL...")
         # First connect without database to create it if needed
-        conn = mysql.connector.connect(
-            host=Config.MYSQL_HOST,
-            user=Config.MYSQL_USER,
-            password=Config.MYSQL_PASSWORD or '',
-            port=Config.MYSQL_PORT,
-            autocommit=True
-        )
+        try:
+            conn = mysql.connector.connect(
+                host=Config.MYSQL_HOST,
+                user=Config.MYSQL_USER,
+                password=Config.MYSQL_PASSWORD or '',
+                port=Config.MYSQL_PORT,
+                autocommit=True
+            )
+        except Exception as e:
+            print(f"❌ Initial connection failed: {e}")
+            print(f"Attempted connection: host={Config.MYSQL_HOST}, user={Config.MYSQL_USER}, port={Config.MYSQL_PORT}")
+            raise
+            
         cursor = conn.cursor()
         
         # Create database if it doesn't exist
