@@ -9,5 +9,5 @@ COPY . .
 
 EXPOSE 8000
 
-# Initialize database and start app
-CMD ["sh", "-c", "python init_railway.py; gunicorn -w 4 -b 0.0.0.0:8000 app:app"]
+# Try to initialize database (non-blocking), then start app
+CMD ["sh", "-c", "python init_railway.py 2>&1 || true; gunicorn -w 4 -b 0.0.0.0:8000 app:app"]

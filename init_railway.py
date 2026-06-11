@@ -3,6 +3,7 @@
 import mysql.connector
 import bcrypt
 import os
+import sys
 from config import Config
 
 def hash_password(password):
@@ -11,8 +12,12 @@ def hash_password(password):
 
 def read_schema():
     """Read schema.sql file"""
-    with open('database/schema.sql', 'r') as f:
-        return f.read()
+    try:
+        with open('database/schema.sql', 'r') as f:
+            return f.read()
+    except FileNotFoundError:
+        print("⚠️  schema.sql not found, skipping schema initialization")
+        return None
 
 def init_database():
     """Initialize the database"""
@@ -22,15 +27,15 @@ def init_database():
         conn = mysql.connector.connect(
             host=Config.MYSQL_HOST,
             user=Config.MYSQL_USER,
-            password=Config.MYSQL_PASSWORD if Config.MYSQL_PASSWORD else '',
-            port=Config.MYSQL_PORT
+            password=Config.MYSQL_PASSWORD or '',
+            port=Config.MYSQL_PORT,
+            autocommit=True
         )
         cursor = conn.cursor()
         
         # Create database if it doesn't exist
         print(f"📝 Creating database '{Config.MYSQL_DATABASE}' if needed...")
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {Config.MYSQL_DATABASE}")
-        conn.commit()
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{Config.MYSQL_DATABASE}`")
         
         cursor.close()
         conn.close()
@@ -40,30 +45,35 @@ def init_database():
         conn = mysql.connector.connect(
             host=Config.MYSQL_HOST,
             user=Config.MYSQL_USER,
-            password=Config.MYSQL_PASSWORD if Config.MYSQL_PASSWORD else '',
+            password=Config.MYSQL_PASSWORD or '',
             database=Config.MYSQL_DATABASE,
-            port=Config.MYSQL_PORT
+            port=Config.MYSQL_PORT,
+            autocommit=False
         )
         cursor = conn.cursor()
         
         # Read and execute schema
-        print("📝 Creating database tables...")
         schema = read_schema()
-        
-        # Split by semicolon and execute each statement
-        statements = schema.split(';')
-        for statement in statements:
-            statement = statement.strip()
-            if statement:
-                try:
-                    cursor.execute(statement)
-                except mysql.connector.errors.ProgrammingError as e:
-                    # Skip if table already exists
-                    if "already exists" not in str(e):
-                        print(f"⚠️  {e}")
-        
-        conn.commit()
-        print("✅ Database tables created/updated!")
+        if schema:
+            print("📝 Creating database tables...")
+            # Remove comments and split properly
+            lines = [line.strip() for line in schema.split('\n') if line.strip() and not line.strip().startswith('--')]
+            current_statement = ""
+            
+            for line in lines:
+                current_statement += " " + line
+                if line.endswith(';'):
+                    statement = current_statement.strip()
+                    if statement and not statement.startswith('CREATE DATABASE'):
+                        try:
+                            cursor.execute(statement)
+                        except Exception as e:
+                            if "already exists" not in str(e):
+                                print(f"⚠️  {e}")
+                    current_statement = ""
+            
+            conn.commit()
+            print("✅ Database tables created/updated!")
         
         # Verify and create default admin if needed
         cursor.execute("SELECT * FROM users WHERE email = %s", ('admin@smartg.co.ke',))
@@ -90,7 +100,8 @@ def init_database():
         return True
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"⚠️  Database initialization warning: {e}")
+        print("   App will attempt to initialize on first login")
         return False
 
 if __name__ == '__main__':
