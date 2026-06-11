@@ -385,11 +385,16 @@ async function renderNewSale() {
     });
     
     document.getElementById("completeSaleBtn")?.addEventListener("click", async () => {
+        if (saleItems.length === 0) {
+            showToast("Add at least one item to sale");
+            return;
+        }
         const items = saleItems.map(i => ({ product_id: i.productId, quantity: i.qty }));
         try {
-            await apiCall('/sales', 'POST', { items });
+            const result = await apiCall('/sales', 'POST', { items });
             showToast("Sale Completed Successfully! Stock has been deducted.");
-            navigateTo("dashboard");
+            saleItems = [{ productId: products[0]?.id || 1, qty: 1 }];
+            await navigateTo("history");
         } catch (e) {
             showToast("Error: " + e.message);
         }
@@ -534,16 +539,20 @@ async function renderProducts() {
                         </thead>
                         <tbody>
                             ${products.map(p => {
-                                const profit = p.price - p.cost - (p.sales_commission + p.manager_commission);
+                                const price = parseFloat(p.price) || 0;
+                                const cost = parseFloat(p.cost) || 0;
+                                const salesComm = parseFloat(p.sales_commission) || 0;
+                                const managerComm = parseFloat(p.manager_commission) || 0;
+                                const profit = price - cost - (salesComm + managerComm);
                                 return `
                                     <tr>
                                         <td>${p.product_code}</td>
                                         <td>${p.name}</td>
-                                        <td>Ksh ${p.price}</td>
-                                        <td>Ksh ${p.cost}</td>
-                                        <td>Ksh ${p.sales_commission}</td>
-                                        <td>Ksh ${p.manager_commission}</td>
-                                        <td class="profit-col">Ksh ${profit}</td>
+                                        <td>Ksh ${price}</td>
+                                        <td>Ksh ${cost}</td>
+                                        <td>Ksh ${salesComm}</td>
+                                        <td>Ksh ${managerComm}</td>
+                                        <td class="profit-col">Ksh ${profit.toFixed(2)}</td>
                                         <td>${p.central_stock}</td>
                                         <td>
                                             <button class="btn-small btn-warning addStockBtn" data-id="${p.id}" data-name="${p.name}" data-stock="${p.central_stock}"><i class="fas fa-plus"></i> Add Stock</button>
@@ -1150,10 +1159,16 @@ document.getElementById("closeProductModalBtn")?.addEventListener("click", () =>
 document.getElementById("confirmAddStockBtn")?.addEventListener("click", async () => {
     const qty = parseInt(document.getElementById("addStockQuantity").value);
     if (!qty || qty <= 0) return showToast("Enter valid quantity");
-    await apiCall(`/products/${window.currentProductId}/add-stock`, 'POST', { quantity: qty });
-    showToast(`Added ${qty} units to stock`);
-    document.getElementById("addStockModal").style.display = "none";
-    renderProducts();
+    if (!window.currentProductId) return showToast("Product ID not set");
+    try {
+        await apiCall(`/products/${window.currentProductId}/add-stock`, 'POST', { quantity: qty });
+        showToast(`Added ${qty} units to stock`);
+        document.getElementById("addStockModal").style.display = "none";
+        document.getElementById("addStockQuantity").value = "";
+        await renderProducts();
+    } catch (e) {
+        showToast("Error adding stock: " + e.message);
+    }
 });
 
 document.getElementById("closeAddStockModalBtn")?.addEventListener("click", () => {

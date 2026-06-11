@@ -12,13 +12,31 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config.from_object(Config)
 CORS(app)
 
+# Database initialization flag
+_db_initialized = False
+
+def init_db_on_startup():
+    """Initialize database if not already done"""
+    global _db_initialized
+    if _db_initialized:
+        return
+    
+    try:
+        # Try to initialize database
+        from init_railway import init_database
+        init_database()
+        _db_initialized = True
+    except Exception as e:
+        print(f"Note: Database initialization attempted: {e}")
+
 # Database connection
 def get_db():
     return mysql.connector.connect(
         host=app.config['MYSQL_HOST'],
         user=app.config['MYSQL_USER'],
         password=app.config['MYSQL_PASSWORD'],
-        database=app.config['MYSQL_DATABASE']
+        database=app.config['MYSQL_DATABASE'],
+        port=app.config['MYSQL_PORT']
     )
 
 # JWT Decorator
@@ -56,6 +74,10 @@ def serve_static(path):
 # ==================== AUTHENTICATION ====================
 @app.route('/api/login', methods=['POST'])
 def login():
+    global _db_initialized
+    if not _db_initialized:
+        init_db_on_startup()
+    
     data = request.json
     email = data.get('email')
     password = data.get('password')
@@ -256,12 +278,22 @@ def delete_product(product_id):
     
     db = get_db()
     cursor = db.cursor()
-    cursor.execute("DELETE FROM products WHERE id = %s", (product_id,))
-    db.commit()
-    cursor.close()
-    db.close()
-    
-    return jsonify({'success': True})
+    try:
+        # Delete related records first
+        cursor.execute("DELETE FROM sale_items WHERE product_id = %s", (product_id,))
+        cursor.execute("DELETE FROM branch_stock WHERE product_id = %s", (product_id,))
+        cursor.execute("DELETE FROM stock_approvals WHERE product_id = %s", (product_id,))
+        # Now delete the product
+        cursor.execute("DELETE FROM products WHERE id = %s", (product_id,))
+        db.commit()
+        cursor.close()
+        db.close()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.rollback()
+        cursor.close()
+        db.close()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/products/<int:product_id>/add-stock', methods=['POST'])
 @token_required
@@ -270,17 +302,36 @@ def add_product_stock(product_id):
         return jsonify({'error': 'Admin access required'}), 403
     
     data = request.json
-    quantity = data.get('quantity', 0)
+    quantity = int(data.get('quantity', 0))
+    
+    if quantity <= 0:
+        return jsonify({'error': 'Quantity must be greater than 0'}), 400
     
     db = get_db()
-    cursor = db.cursor()
+    cursor = db.cursor(dictionary=True)
+    
+    # Check if product exists
+    cursor.execute("SELECT id, central_stock FROM products WHERE id = %s", (product_id,))
+    product = cursor.fetchone()
+    
+    if not product:
+        cursor.close()
+        db.close()
+        return jsonify({'error': 'Product not found'}), 404
+    
+    # Update stock
     cursor.execute("UPDATE products SET central_stock = central_stock + %s WHERE id = %s", 
                    (quantity, product_id))
     db.commit()
+    
+    # Get updated stock
+    cursor.execute("SELECT central_stock FROM products WHERE id = %s", (product_id,))
+    updated = cursor.fetchone()
+    
     cursor.close()
     db.close()
     
-    return jsonify({'success': True})
+    return jsonify({'success': True, 'new_stock': updated['central_stock']})
 
 # ==================== BRANCH STOCK ====================
 @app.route('/api/branch-stock', methods=['GET'])
@@ -402,6 +453,9 @@ def create_sale():
     branch_name = request.user['branch_name']
     sale_date = datetime.datetime.now().date()
     
+    if not items or len(items) == 0:
+        return jsonify({'error': 'Sale must contain at least one item'}), 400
+    
     db = get_db()
     cursor = db.cursor(dictionary=True)
     
@@ -410,6 +464,15 @@ def create_sale():
     
     # Check stock availability and calculate totals
     for item in items:
+        if not item.get('product_id') or not item.get('quantity'):
+            cursor.close()
+            db.close()
+            return jsonify({'error': 'Product ID and quantity required for all items'}), 400
+        
+        if int(item['quantity']) <= 0:
+            cursor.close()
+            db.close()
+            return jsonify({'error': 'Quantity must be greater than 0'}), 400
         cursor.execute("SELECT * FROM products WHERE id = %s", (item['product_id'],))
         product = cursor.fetchone()
         if not product:
