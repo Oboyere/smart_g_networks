@@ -7,7 +7,8 @@ RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
 COPY . .
 
-EXPOSE 8000
+# Use port from environment variable or default to 8000
+ENV PORT=8000
 
-# Try to initialize database (non-blocking), then start app
-CMD ["sh", "-c", "python init_railway.py 2>&1 || true; gunicorn -w 4 -b 0.0.0.0:8000 app:app"]
+# Try to initialize database (non-blocking), then start app with proper port
+CMD ["sh", "-c", "python init_railway.py 2>&1 || true; gunicorn -w 4 -b 0.0.0.0:${PORT} app:app"]

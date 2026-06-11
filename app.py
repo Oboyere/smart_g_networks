@@ -12,6 +12,21 @@ app = Flask(__name__, static_folder='static', static_url_path='/static')
 app.config.from_object(Config)
 CORS(app)
 
+# Error handlers
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    print(f"Internal server error: {error}")
+    return jsonify({'error': 'Internal server error'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    print(f"Unhandled exception: {type(e).__name__}: {e}")
+    return jsonify({'error': 'Internal server error', 'type': type(e).__name__}), 500
+
 # Database initialization flag
 _db_initialized = False
 
@@ -70,17 +85,29 @@ def check_password(password, hashed):
 # Serve index.html
 @app.route('/')
 def serve_index():
-    return send_from_directory('static', 'index.html')
+    try:
+        return send_from_directory('static', 'index.html')
+    except Exception as e:
+        print(f"Error serving index.html: {e}")
+        return jsonify({'error': 'Static files not available', 'details': str(e)}), 500
 
 @app.route('/static/<path:path>')
 def serve_static(path):
-    return send_from_directory('static', path)
+    try:
+        return send_from_directory('static', path)
+    except Exception as e:
+        print(f"Error serving static file {path}: {e}")
+        return jsonify({'error': 'Static file not found'}), 404
 
 # Health check endpoint
 @app.route('/health')
 def health_check():
     """Health check endpoint for Railway"""
-    return jsonify({'status': 'healthy'}), 200
+    try:
+        return jsonify({'status': 'healthy', 'timestamp': datetime.datetime.utcnow().isoformat()}), 200
+    except Exception as e:
+        print(f"Health check error: {e}")
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
 
 # ==================== AUTHENTICATION ====================
 @app.route('/api/login', methods=['POST'])
@@ -872,4 +899,16 @@ def admin_reset_sales():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    try:
+        # Try to initialize database on startup
+        print("Initializing database...")
+        init_db_on_startup()
+    except Exception as e:
+        print(f"Database initialization on startup failed (non-blocking): {e}")
+    
+    try:
+        print("Starting Flask app...")
+        app.run(debug=False, host='0.0.0.0', port=5000)
+    except Exception as e:
+        print(f"Fatal error starting app: {e}")
+        raise
