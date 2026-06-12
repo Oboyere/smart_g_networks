@@ -1,6 +1,6 @@
 // Application JavaScript
 // API Base URL
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE = '/api';
 
 let currentUser = null;
 let currentView = "dashboard";
