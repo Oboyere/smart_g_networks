@@ -25,7 +25,11 @@ def internal_error(error):
 @app.errorhandler(Exception)
 def handle_exception(e):
     print(f"Unhandled exception: {type(e).__name__}: {e}")
-    return jsonify({'error': 'Internal server error', 'type': type(e).__name__}), 500
+    return jsonify({
+        'error': 'Internal server error',
+        'type': type(e).__name__,
+        'message': str(e)
+    }), 500
 
 # Database initialization flag
 _db_initialized = False
